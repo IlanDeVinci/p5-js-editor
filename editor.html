@@ -1,0 +1,769 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>p5.js Graphical Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg-primary: #1e1e2e;
+            --bg-secondary: #2a2a3a;
+            --bg-tertiary: #3a3a4a;
+            --text-primary: #cdd6f4;
+            --text-secondary: #bac2de;
+            --accent: #89b4fa;
+            --accent-hover: #74c7ec;
+            --border: #45475a;
+            --success: #a6e3a1;
+            --error: #f38ba8;
+            --shadow: rgba(0, 0, 0, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+            color: var(--text-primary);
+        }
+
+        #left {
+            width: 360px;
+            background: var(--bg-secondary);
+            padding: 16px;
+            box-sizing: border-box;
+            border-right: 2px solid var(--border);
+            box-shadow: 2px 0 8px var(--shadow);
+        }
+
+        #center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            overflow: auto;
+        }
+
+        #right {
+            width: 360px;
+            background: var(--bg-secondary);
+            padding: 16px;
+            box-sizing: border-box;
+            border-left: 2px solid var(--border);
+            overflow: auto;
+            height: 100vh;
+            box-shadow: -2px 0 8px var(--shadow);
+        }
+
+        .toolbar button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .toolbar button:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+            box-shadow: 0 2px 6px rgba(137, 180, 250, 0.3);
+        }
+
+        .toolbar button:active {
+            background: var(--accent-hover);
+        }
+
+        #canvas-holder {
+            width: 800px;
+            height: 800px;
+            background: white;
+            box-shadow: 0 8px 24px var(--shadow);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: border-color 0.3s ease;
+        }
+
+        #canvas-holder:hover {
+            border-color: var(--accent);
+        }
+
+        .panel {
+            margin-bottom: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 4px 12px var(--shadow);
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+
+        .panel:hover {
+            box-shadow: 0 6px 20px var(--shadow);
+        }
+
+        label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        input[type=color],
+        input[type=file] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        textarea {
+            width: 100%;
+            height: 340px;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 13px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            resize: vertical;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: inset 0 1px 3px var(--shadow);
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 10px 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 13px;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .tab-button.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            box-shadow: 0 2px 6px rgba(137, 180, 250, 0.3);
+        }
+
+        .tab-button:hover {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Additional styles for better UX */
+        h3 {
+            margin-top: 0;
+            color: var(--accent);
+            font-weight: 700;
+            text-shadow: 0 1px 2px var(--shadow);
+        }
+
+        #status-bar {
+            width: 80%;
+            border-radius: 10px 10px 0 0;
+            background: var(--bg-tertiary);
+            border-top: 2px solid var(--border);
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 -2px 8px var(--shadow);
+        }
+
+        #notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, var(--success) 0%, var(--accent-hover) 100%);
+            color: var(--bg-primary);
+            padding: 16px 24px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px var(--shadow);
+            z-index: 10001;
+            transform: translateX(400px);
+            transition: transform 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            font-weight: 600;
+            display: none;
+            border: 1px solid var(--border);
+            animation: slideIn 0.5s ease-out;
+        }
+
+        #notification.show {
+            transform: translateX(0);
+            animation: bounce 0.6s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes bounce {
+            0% {
+                transform: translateX(0) scale(0.8);
+            }
+
+            50% {
+                transform: translateX(0) scale(1.05);
+            }
+
+            100% {
+                transform: translateX(0) scale(1);
+            }
+        }
+
+        /* Modal improvements */
+        #help-overlay,
+        #export-modal,
+        #add-shape-modal,
+        #history-modal {
+            backdrop-filter: blur(4px);
+        }
+
+        #help-overlay>div,
+        #export-modal>div,
+        #add-shape-modal>div,
+        #history-modal>div {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 16px;
+            box-shadow: 0 12px 40px var(--shadow);
+        }
+
+        /* Floating layers */
+        #floating-layers {
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px var(--shadow);
+        }
+
+        #floating-layers-handle {
+            background: var(--bg-tertiary);
+            border-bottom: 2px solid var(--border);
+        }
+
+        /* Color swatches */
+        .color-swatch {
+            border-radius: 6px !important;
+            box-shadow: 0 2px 4px var(--shadow) !important;
+        }
+
+        /* Inputs */
+        input[type="number"],
+        input[type="text"],
+        select {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        input[type="number"]:focus,
+        input[type="text"]:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+        }
+
+        /* Range inputs */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border);
+            height: 6px;
+            border-radius: 3px;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        button {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 13px;
+            padding: 8px 12px;
+            font-family: inherit;
+        }
+
+        button:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        button:active {
+            background: var(--accent-hover);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="left">
+        <h3>Editor</h3>
+        <div class="tabs">
+            <button class="tab-button active" data-tab="tools">Tools</button>
+            <button class="tab-button" data-tab="colors">Colors</button>
+            <button class="tab-button" data-tab="history">History</button>
+            <button class="tab-button" data-tab="transform">Transform</button>
+            <button class="tab-button" data-tab="arrange">Arrange</button>
+            <button class="tab-button" data-tab="import">Import</button>
+        </div>
+        <div id="tools-tab" class="tab-content active">
+            <!-- Contextual toolbar removed for now -->
+            <div id="context-toolbar"
+                style="display:none; margin-bottom:8px; padding:6px; background:#fff; border:1px solid #eee;">
+                <!-- disabled -->
+            </div>
+            <div class="toolbar">
+                <button id="tool-select">Select / Move</button>
+                <button id="tool-vertex">Vertex Edit</button>
+                <button id="tool-lasso">Lasso</button>
+                <button id="add-shape">Add Shape</button>
+                <button id="round-up-btn">Round Up</button>
+                <label style="margin-left:8px; font-size:12px;">Coords</label>
+                <select id="round-coords-select" title="Round coords/vertices" style="margin-left:6px">
+                    <option value="int">Integer</option>
+                    <option value="5">Nearest 5</option>
+                    <option value="0.1">Nearest 0.1</option>
+                    <option value="0.01">Nearest 0.01</option>
+                </select>
+                <label style="margin-left:8px; font-size:12px;">Transform</label>
+                <select id="round-transform-select" title="Round scale/rotation"
+                    style="margin-left:6px; margin-bottom: 20px;">
+                    <option value="0.1">Nearest 0.1</option>
+                    <option value="0.01">Nearest 0.01</option>
+                    <option value="int">Integer</option>
+                </select>
+                <button id="group-btn">Group Selected</button>
+                <button id="ungroup-btn">Ungroup Selected</button>
+                <button id="duplicate-btn">Duplicate Selected</button>
+                <button id="delete-btn">Delete Selected</button>
+            </div>
+            <div id="layer-panel" class="panel" style="display:none">
+                <label>Scene / Layers</label>
+                <input id="layer-search" placeholder="Search layers..."
+                    style="width:100%; margin-bottom:6px; box-sizing:border-box;" />
+                <div id="layer-list"
+                    style="max-height:160px; overflow:auto; border:1px solid #eee; background:#fff; padding:6px"></div>
+                <div style="display:flex; gap:6px;">
+                    <button id="btn-undo">Undo</button>
+                    <button id="btn-redo">Redo</button>
+                    <button id="open-history-modal">History...</button>
+                </div>
+            </div>
+        </div>
+        <div id="colors-tab" class="tab-content">
+            <div class="panel">
+                <label>Fill Color</label>
+                <!-- visible swatch; hidden native color input used for editing on double-click -->
+                <div id="fill-swatch" title="Fill color"
+                    style="width:28px;height:28px;border:1px solid #ccc;background:#ffebdd;cursor:pointer;display:inline-block;vertical-align:middle;margin-right:8px">
+                </div>
+                <input id="fill-color" type="color" value="#ffebdd" style="display:none">
+                <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+                    <label style="margin:0; font-size:12px;">Opacity</label>
+                    <input id="fill-opacity" type="range" min="0" max="100" value="100" style="flex:1">
+                    <label style="margin:0; font-size:12px; display:flex; align-items:center; gap:6px;"><input
+                            id="no-fill" type="checkbox"> No Fill</label>
+                </div>
+            </div>
+            <div class="panel">
+                <label>Colors (Primary / Secondary)</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <div id="primary-color" class="color-swatch" title="Primary color"
+                        style="width:28px;height:28px;border:1px solid #ccc;background:#ffebdd;cursor:pointer;"></div>
+                    <div id="secondary-color" class="color-swatch" title="Secondary color"
+                        style="width:28px;height:28px;border:1px solid #ccc;background:#362f38;cursor:pointer;"></div>
+                    <button id="pipette-btn">Pipette</button>
+                    <button id="add-to-palette">+ Palette</button>
+                </div>
+                <div id="color-palette" style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;"></div>
+                <div style="margin-top:6px; display:flex; gap:6px;">
+                    <button id="apply-palette-primary">→ Primary</button>
+                    <button id="apply-palette-secondary">→ Secondary</button>
+                    <button id="apply-palette-selection">→ Selection</button>
+                </div>
+                <div id="color-target-label" style="margin-top:6px; font-size:12px; color:#333;">Target: primary</div>
+            </div>
+            <div class="panel">
+                <label>Stroke Color</label>
+                <!-- visible swatch; hidden native color input used for editing on double-click -->
+                <div id="stroke-swatch" title="Stroke color"
+                    style="width:28px;height:28px;border:1px solid #ccc;background:#362f38;cursor:pointer;display:inline-block;vertical-align:middle;margin-right:8px">
+                </div>
+                <input id="stroke-color" type="color" value="#362f38" style="display:none">
+                <div style="margin-top:6px; display:flex; gap:8px; align-items:center;">
+                    <label style="margin:0; font-size:12px;">Opacity</label>
+                    <input id="stroke-opacity" type="range" min="0" max="100" value="100" style="flex:1">
+                    <label style="margin:0; font-size:12px; display:flex; align-items:center; gap:6px;"><input
+                            id="no-stroke" type="checkbox"> No Stroke</label>
+                </div>
+                <label class="small">Weight</label>
+                <input id="stroke-weight" type="number" value="2" min="0" style="width:100%;">
+            </div>
+        </div>
+        <div id="history-tab" class="tab-content">
+            <div class="panel">
+                <label>History</label>
+                <div id="history-inline-list"
+                    style="max-height:240px; overflow:auto; border:1px solid #eee; background:#fff; padding:6px; font-family:monospace; font-size:12px;">
+                </div>
+                <div style="margin-top:8px; display:flex; gap:6px;">
+                    <button id="btn-undo-inline">Undo</button>
+                    <button id="btn-redo-inline">Redo</button>
+                    <button id="open-history-modal-inline">Open Full History</button>
+                </div>
+            </div>
+        </div>
+        <div id="transform-tab" class="tab-content">
+            <div class="panel">
+                <label>Transform / Nudge</label>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                    <label style="width:40px">X</label>
+                    <input id="transform-x" type="number" step="0.1" style="flex:1">
+                </div>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                    <label style="width:40px">Y</label>
+                    <input id="transform-y" type="number" step="0.1" style="flex:1">
+                </div>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                    <label style="width:40px">Rot</label>
+                    <input id="transform-rot" type="number" step="0.1" style="flex:1">
+                </div>
+                <div style="display:flex; gap:6px; align-items:center; margin-bottom:6px;">
+                    <label style="width:40px">Scale</label>
+                    <input id="transform-scale" type="number" step="0.01" style="flex:1">
+                </div>
+                <div style="display:flex; gap:6px; margin-top:6px;">
+                    <button id="nudge-up">↑</button>
+                    <button id="nudge-left">←</button>
+                    <button id="nudge-right">→</button>
+                    <button id="nudge-down">↓</button>
+                    <button id="nudge-10" title="Nudge 10px">×10</button>
+                    <label style="margin-left:auto; font-size:12px; display:flex; gap:6px; align-items:center;">
+                        <input id="snap-to-grid" type="checkbox"> 📐 Snap to grid
+                        <input id="grid-size" type="number" value="10" min="1" step="1" title="Grid size (px)"
+                            style="width:64px;">
+                    </label>
+                </div>
+                <div style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+                    <label style="font-size:12px; display:flex; gap:6px; align-items:center;"><input
+                            id="snap-while-dragging" type="checkbox" checked> Snap while dragging</label>
+                    <label style="font-size:12px; display:flex; gap:6px; align-items:center;"><input
+                            id="marquee-contains" type="checkbox"> Marquee: contains</label>
+                    <label style="font-size:12px; display:flex; gap:6px; align-items:center;"><span>Major lines
+                            every</span><input id="grid-major-step" type="number" value="5" min="1" step="1"
+                            style="width:64px;"></label>
+                </div>
+                <div style="margin-top:8px; font-size:12px;">
+                    <label style="display:block;"><input id="auto-apply-scale" type="checkbox" checked /> Auto-apply
+                        scale on
+                        transform end</label>
+                    <label style="display:block;"><input id="auto-apply-rotate" type="checkbox" checked /> Auto-apply
+                        rotate on
+                        transform end</label>
+                </div>
+                <div style="margin-top:8px; font-size:12px;">
+                    <label style="display:block;"><input id="show-guides" type="checkbox" /> Show alignment
+                        guides</label>
+                    <label style="display:block;"><input id="snap-to-guides" type="checkbox" /> Snap to guides while
+                        dragging</label>
+                    <label style="display:block;"><input id="show-grid" type="checkbox" /> Show grid</label>
+                    <label style="display:block;">Snap tolerance (px): <input id="snap-tolerance" type="number"
+                            value="6" min="1" style="width:72px; margin-left:6px" /></label>
+                </div>
+            </div>
+        </div>
+        <div id="arrange-tab" class="tab-content">
+            <div class="panel">
+                <label>Arrange</label>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                    <button id="align-left">Align left</button>
+                    <button id="align-center">Align center</button>
+                    <button id="align-right">Align right</button>
+                    <button id="align-top">Align top</button>
+                    <button id="align-middle">Align middle</button>
+                    <button id="align-bottom">Align bottom</button>
+                    <button id="distribute-h">Distribute H</button>
+                    <button id="distribute-v">Distribute V</button>
+                    <button id="bring-forward">Bring forward</button>
+                    <button id="send-back">Send back</button>
+                    <button id="bring-front">Bring to front</button>
+                    <button id="send-backmost">Send to back</button>
+                    <div style="width:100%; margin-top:8px; display:flex; gap:6px;">
+                        <button id="bool-union">Union</button>
+                        <button id="bool-diff">Subtract</button>
+                        <button id="bool-intersect">Intersect</button>
+                        <button id="bool-xor">XOR</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="import-tab" class="tab-content">
+            <div class="panel">
+                <label>Import / Export</label>
+                <input id="import-file" type="file" accept="application/json">
+                <button id="export-btn">Export / Download</button>
+                <button id="save-local">Save to localStorage</button>
+                <button id="load-local">Load from localStorage</button>
+                <hr />
+                <label>Import p5 sketch (sketch.js)</label>
+                <input id="import-sketch" type="file" accept="text/javascript">
+                <button id="export-p5-source">Export to p5.js source</button>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Help overlay (keyboard shortcuts) -->
+    <div id="help-overlay"
+        style="display:none; position:fixed; left:16px; top:16px; right:16px; bottom:16px; background:rgba(0,0,0,0.7); color:#fff; z-index:9999; align-items:center; justify-content:center;">
+        <div
+            style="max-width:780px; margin:auto; background:#222; padding:18px; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.6);">
+            <h2 style="margin-top:0">Keyboard Shortcuts</h2>
+            <ul>
+                <li><strong>V</strong> — Select / Move tool</li>
+                <li><strong>E</strong> — Add Ellipse (opens Add Shape)</li>
+                <li><strong>R</strong> — Add Rect (opens Add Shape)</li>
+                <li><strong>L</strong> — Line tool (draw line)</li>
+                <li><strong>B</strong> — Bezier tool (click 4 points)</li>
+                <li><strong>P</strong> — Pipette (sample color)</li>
+                <li><strong>G</strong> — Group selected</li>
+                <li><strong>Ctrl/Cmd + G</strong> — Toggle grid</li>
+                <li><strong>Ctrl/Cmd + D</strong> — Duplicate selected</li>
+                <li><strong>Ctrl/Cmd + Z</strong> — Undo</li>
+                <li><strong>Ctrl/Cmd + Y</strong> — Redo</li>
+                <li><strong>Delete / Backspace</strong> — Delete selection</li>
+                <li><strong>?</strong> or <strong>H</strong> — Toggle this help</li>
+                <li><strong>Esc</strong> — Close modals / cancel</li>
+            </ul>
+            <div style="text-align:right;"><button id="help-close">Close</button></div>
+        </div>
+    </div>
+
+    <!-- Export modal: filename + format -->
+    <div id="export-modal"
+        style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:9998;">
+        <div style="background:#fff; padding:16px; width:360px; margin:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+            <h4>Export / Download</h4>
+            <div style="display:flex; gap:8px; flex-direction:column;">
+                <label>Filename</label>
+                <input id="export-filename" type="text" value="scene" style="width:100%" />
+                <label>Format</label>
+                <select id="export-format" style="width:100%">
+                    <option value="json">JSON (.json)</option>
+                    <option value="p5">p5.js (.js)</option>
+                    <option value="png">PNG (.png)</option>
+                    <option value="svg">SVG (.svg)</option>
+                </select>
+                <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+                    <button id="export-cancel">Cancel</button>
+                    <button id="export-do">Export</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="center">
+        <div id="canvas-holder"></div>
+        <div id="status-bar"
+            style="width:80%; background:#f0f0f0; border-top:1px solid #ddd; padding:4px 8px; font-size:12px; color:#333; display:flex; justify-content:space-between; align-items:center;">
+            <span id="status-tool">Tool: Select</span>
+            <span id="status-selection">Selection: 0 items</span>
+            <span id="status-zoom">Zoom: 100%</span>
+        </div>
+    </div>
+
+    <div id="right">
+        <h3>Inspector</h3>
+        <div class="panel">
+            <label>Selected JSON</label>
+            <textarea id="json-inspector" placeholder="Select a shape to see/edit JSON"></textarea>
+            <div style="margin-top:8px;">
+                <label>Text content (for text shapes)</label>
+                <input id="inspector-text-input" type="text" placeholder="Edit text content" style="width:100%" />
+            </div>
+            <div style="margin-top:8px;">
+                <label>Image URL (for image shapes)</label>
+                <input id="inspector-image-url" type="text" placeholder="Image URL" style="width:100%" />
+            </div>
+            <div style="display:flex; gap:8px; margin-top:6px;">
+                <button id="apply-json">Apply JSON</button>
+                <button id="apply-scale-btn">Apply Scale</button>
+                <button id="apply-rotate-btn">Apply Rotate</button>
+            </div>
+            <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+                <button id="add-vertex-btn">Add Vertex</button>
+                <button id="delete-vertex-btn">Delete Vertex</button>
+                <button id="add-vertex-edge-btn">Add Vertex On Edge</button>
+                <button id="toggle-smooth-btn">Toggle Smooth</button>
+                <button id="convert-text-path">Convert Text → Path</button>
+                <button id="convert-image-shape">Convert Image → Shape</button>
+            </div>
+        </div>
+        <div class="panel">
+            <label>Scene JSON</label>
+            <textarea id="scene-json" placeholder="Entire scene JSON"></textarea>
+            <button id="apply-scene">Load Scene JSON</button>
+        </div>
+        <div class="panel">
+            <label>Tips</label>
+            <ul>
+                <li>Use Select tool to move shapes.</li>
+                <li>Use Vertex Edit to drag individual vertices (polygons/paths).</li>
+                <li>Inspector shows editable JSON for selected item.</li>
+                <li>Groups are objects with type="group" and children array.</li>
+            </ul>
+        </div>
+    </div>
+    <!-- Notification -->
+    <div id="notification"
+        style="position:fixed; top:20px; right:20px; background:#4caf50; color:white; padding:12px 20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.2); z-index:10001; transform:translateX(400px); transition:transform 0.3s; font-weight:600; display:none;">
+    </div>
+
+    <script src="libraries/p5.min.js"></script>
+    <!-- polygon boolean operations library (polygon-clipping) -->
+    <script src="https://unpkg.com/polygon-clipping@0.17.0/dist/polygon-clipping.min.js"></script>
+    <div id="floating-layers"
+        style="position:fixed; right:16px; top:80px; width:320px; background:var(--bg-secondary); border:2px solid var(--border); border-radius:12px; box-shadow:0 12px 32px var(--shadow); z-index:10000; backdrop-filter:blur(8px);">
+        <div id="floating-layers-handle"
+            style="cursor:move; padding:12px 16px; background:var(--bg-tertiary); border-bottom:2px solid var(--border); border-radius:10px 10px 0 0; display:flex; justify-content:space-between; align-items:center;">
+            <strong style="font-size:13px;">Layers</strong>
+            <div>
+                <button id="floating-layers-toggle" title="Hide layers" style="margin-right:6px">_</button>
+                <button id="floating-layers-close" title="Close">×</button>
+            </div>
+        </div>
+        <div id="floating-layers-content" style="padding:12px; max-height:450px; overflow:auto;">
+            <input id="floating-layer-search" placeholder="Search layers..."
+                style="width:100%; margin-bottom:6px; box-sizing:border-box;" />
+            <div id="floating-layer-list"
+                style="min-height:80px; border:1px solid var(--border); background:var(--bg-primary); padding:6px;">
+            </div>
+        </div>
+    </div>
+    <!-- simple modal for adding shapes -->
+    <div id="add-shape-modal"
+        style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center;">
+        <div style="background:#fff; padding:16px; width:320px; margin:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+            <h4>Add Shape</h4>
+            <button id="modal-add-ellipse" style="width:100%; margin-bottom:8px">Ellipse</button>
+            <button id="modal-add-rect" style="width:100%; margin-bottom:8px">Rect</button>
+            <button id="modal-add-polygon" style="width:100%; margin-bottom:8px">Polygon</button>
+            <button id="modal-add-line" style="width:100%; margin-bottom:8px">Line</button>
+            <button id="modal-add-bezier" style="width:100%; margin-bottom:8px">Bezier</button>
+            <button id="modal-add-text" style="width:100%; margin-bottom:8px">Text</button>
+            <button id="modal-add-image" style="width:100%; margin-bottom:8px">Image</button>
+            <div style="text-align:right; margin-top:8px;"><button id="modal-close">Close</button></div>
+        </div>
+    </div>
+    <!-- History modal -->
+    <div id="history-modal"
+        style="display:none; position:fixed; left:0; top:0; right:0; bottom:0; background:rgba(0,0,0,0.4); align-items:center; justify-content:center; z-index:10001;">
+        <div
+            style="background:#fff; padding:16px; width:640px; max-height:80vh; overflow:auto; margin:auto; box-shadow:0 8px 24px rgba(0,0,0,0.2);">
+            <h4>History</h4>
+            <div id="history-list"
+                style="border:1px solid #eee; padding:8px; max-height:60vh; overflow:auto; font-family:monospace; font-size:12px;">
+            </div>
+            <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:8px;">
+                <button id="history-close">Close</button>
+            </div>
+        </div>
+    </div>
+    <script src="editor.js"></script>
+</body>
+
+</html>
